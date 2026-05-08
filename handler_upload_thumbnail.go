@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -63,8 +65,12 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	mediaType_split := strings.Split(mediaType, "/")
 	file_extension := mediaType_split[1]
 
-	path := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s.%s", videoID, file_extension))
+	//path := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s.%s", videoID, file_extension))
+	key := make([]byte, 32)
+	rand.Read(key)
 
+	thumbnailName := base64.RawURLEncoding.EncodeToString(key)
+	path := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s.%s", thumbnailName, file_extension))
 	err = cfg.ensureAssetsDir()
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Directory does not exist", err)
