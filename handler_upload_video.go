@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -96,12 +100,12 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	//Step 3.9
 	key := make([]byte, 32)
 	rand.Read(key)
-	str := base64.StdEncoding.EncodeToString(key)
+	str := base64.RawURLEncoding.EncodeToString(key)
 	ext := strings.Split(mediaType, "/")
-	adjusted := strings.ReplaceAll(str, "/", "-")
-	keyString := adjusted + "." + ext[1]
 
-	aspectRatio, err := cfg.getVideoAspectRatio(tempFile.Name())
+	keyString := str + "." + ext[1]
+
+	aspectRatio, err := getVideoAspectRatio(tempFile.Name())
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Unable to get aspect ratio", err)
 		return
@@ -138,4 +142,40 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 
 	respondWithJSON(w, http.StatusOK, video)
+}
+
+func getVideoAspectRatio(filePath string) (string, error) {
+	var ptr bytes.Buffer
+
+	cmd := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", filePath)
+	cmd.Stdout = &ptr
+
+	err := cmd.Run()
+	if err != nil {
+		log.Printf("%s\n", err)
+		return "", fmt.Errorf("Unable to run command: %s", err)
+	}
+
+	type Aspect struct {
+		Streams []struct {
+			Width  int `json:"width"`
+			Height int `json:"height"`
+		} `json:"streams"`
+	}
+
+	var aspect Aspect
+	err = json.Unmarshal(ptr.Bytes(), &aspect)
+	if err != nil {
+		return "", fmt.Errorf("Could not unmarshal: %s", err)
+	}
+
+	width := aspect.Streams[0].Width
+	height := aspect.Streams[0].Height
+
+	if width == 16*height/9 {
+		return "16:9", nil
+	} else if height == 16*width/9 {
+		return "9:16", nil
+	}
+	return "other", nil
 }
