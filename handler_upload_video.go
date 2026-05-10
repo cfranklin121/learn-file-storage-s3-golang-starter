@@ -98,7 +98,24 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	rand.Read(key)
 	str := base64.StdEncoding.EncodeToString(key)
 	ext := strings.Split(mediaType, "/")
-	keyString := str + "." + ext[1]
+	adjusted := strings.ReplaceAll(str, "/", "-")
+	keyString := adjusted + "." + ext[1]
+
+	aspectRatio, err := cfg.getVideoAspectRatio(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to get aspect ratio", err)
+		return
+	}
+
+	switch aspectRatio {
+	case "16:9":
+		keyString = "landscape" + "/" + keyString
+	case "9:16":
+		keyString = "portrait" + "/" + keyString
+	default:
+		keyString = "other" + "/" + keyString
+	}
+
 	params := s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
 		Key:         &keyString,
