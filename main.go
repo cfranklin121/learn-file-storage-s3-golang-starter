@@ -24,6 +24,7 @@ type apiConfig struct {
 	s3Region         string
 	s3CfDistribution string
 	port             string
+	domain           string
 	s3Client         *s3.Client
 }
 
@@ -80,6 +81,11 @@ func main() {
 		log.Fatal("PORT environment variable is not set")
 	}
 
+	domain := os.Getenv("DOMAIN")
+	if port == "" {
+		log.Fatal("DOMAIN environment variable is not set")
+	}
+
 	Client, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(s3Region))
 	if err != nil {
 		log.Fatalf("Couldn't configure S3 client: %v", err)
@@ -97,6 +103,7 @@ func main() {
 		s3Region:         s3Region,
 		s3CfDistribution: s3CfDistribution,
 		port:             port,
+		domain:           domain,
 		s3Client:         s3Client,
 	}
 
